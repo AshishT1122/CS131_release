@@ -91,7 +91,11 @@ def euclidean_distance_native(u, v):
     #     sum.
 
     ### YOUR CODE HERE
-    pass
+    squared_diff_sum = 0
+    for i in range(len(u)):
+        squared_diff_sum += (u[i] - v[i]) ** 2
+
+    return squared_diff_sum ** 0.5
     ### END YOUR CODE
 
 
@@ -123,7 +127,10 @@ def euclidean_distance_numpy(u, v):
     #     sum.
 
     ### YOUR CODE HERE
-    pass
+    diff = u - v
+    squared_diff = np.square(diff)
+    sum_squared_diff = np.sum(squared_diff)
+    return np.sqrt(sum_squared_diff)
     ### END YOUR CODE
 
 

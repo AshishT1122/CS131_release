@@ -20,7 +20,7 @@ def load(image_path):
 
     ### YOUR CODE HERE
     # Use skimage io.imread
-    pass
+    out = io.imread(image_path)
     ### END YOUR CODE
 
     # Let's convert the image to be between the correct range.
@@ -45,7 +45,10 @@ def crop_image(image, start_row, start_col, num_rows, num_cols):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out = image[
+        start_row:start_row + num_rows, 
+        start_col:start_col + num_cols
+        ]
     ### END YOUR CODE
 
     return out
@@ -68,7 +71,7 @@ def dim_image(image):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out = 0.5 * image ** 2
     ### END YOUR CODE
 
     return out
@@ -96,7 +99,14 @@ def resize_image(input_image, output_rows, output_cols):
     #    > This should require two nested for loops!
 
     ### YOUR CODE HERE
-    pass
+    row_scale_factor = input_rows / output_rows
+    col_scale_factor = input_cols / output_cols
+    
+    for i in range(output_rows):
+        for j in range(output_cols):
+            input_i = int(i * row_scale_factor)
+            input_j = int(j * col_scale_factor)
+            output_image[i, j, :] = input_image[input_i, input_j, :]
     ### END YOUR CODE
 
     # 3. Return the output image
@@ -119,7 +129,12 @@ def rotate2d(point, theta):
     # Reminder: np.cos() and np.sin() will be useful here!
 
     ## YOUR CODE HERE
-    pass
+    rotation_matrix = np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta), np.cos(theta)]
+        ])
+    
+    return np.dot(rotation_matrix, point)
     ### END YOUR CODE
 
 
@@ -141,7 +156,20 @@ def rotate_image(input_image, theta):
     output_image = np.zeros_like(input_image)
 
     ## YOUR CODE HERE
-    pass
+    center_row, center_col = input_rows / 2, input_cols / 2
+    cos_theta, sin_theta = np.cos(theta), np.sin(theta)
+    
+    for i in range(input_rows):
+        for j in range(input_cols):
+            trans_i, trans_j = i - center_row, j - center_col
+
+            rotated_i = cos_theta * trans_i - sin_theta * trans_j
+            rotated_j = sin_theta * trans_i + cos_theta * trans_j
+
+            input_i, input_j = rotated_i + center_row, rotated_j + center_col
+
+            if 0 <= input_i < input_rows and 0 <= input_j < input_cols:
+                output_image[i, j] = input_image[int(input_i), int(input_j)]
     ### END YOUR CODE
 
     # 3. Return the output image
