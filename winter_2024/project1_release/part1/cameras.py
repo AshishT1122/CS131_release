@@ -20,7 +20,17 @@ def camera_from_world_transform(d: float = 1.0) -> np.ndarray:
     """
     T = np.eye(4)
     # YOUR CODE HERE
-    pass
+    cos_theta = np.cos(np.pi * 3 / 4)
+    sin_theta = np.sin(np.pi * 3 / 4)
+    
+    t = np.array([0, 0, d])
+    
+    T[:3, :3] = np.array([
+        [cos_theta, 0, sin_theta],
+        [0, 1, 0],
+        [-sin_theta, 0, cos_theta]
+    ])
+    T[:3, 3] = t
     # END YOUR CODE
     assert T.shape == (4, 4)
     return T
@@ -55,7 +65,9 @@ def apply_transform(T: np.ndarray, points: np.ndarray) -> Tuple[np.ndarray]:
     points_transformed = np.zeros((3, N))
 
     # YOUR CODE HERE
-    pass
+    homogeneous_points = np.vstack((points, np.ones(N)))
+    points_transformed_homogeneous = T @ homogeneous_points
+    points_transformed = points_transformed_homogeneous[:3, :] / points_transformed_homogeneous[3, :]
     # END YOUR CODE
 
     assert points_transformed.shape == (3, N)
@@ -86,7 +98,12 @@ def intersection_from_lines(
     out = np.zeros(2)
 
     # YOUR CODE HERE
-    pass
+    A = np.array([a_1 - a_0, b_0 - b_1]).T
+    b = b_0 - a_0
+    
+    params = np.linalg.solve(A, b)
+    
+    out = a_0 + params[0] * (a_1 - a_0)
     # END YOUR CODE
 
     assert out.shape == (2,)
@@ -118,7 +135,7 @@ def optical_center_from_vanishing_points(
     optical_center = np.zeros(2)
 
     # YOUR CODE HERE
-    pass
+    optical_center = intersection_from_lines(v0, v0 + np.array([-(v2-v1)[1], (v2-v1)[0]]), v1, v1 + np.array([-(v2-v0)[1], (v2-v0)[0]]))
     # END YOUR CODE
 
     assert optical_center.shape == (2,)
@@ -144,7 +161,8 @@ def focal_length_from_two_vanishing_points(
     f = None
 
     # YOUR CODE HERE
-    pass
+    term = -np.dot(v0 - optical_center, v1 - optical_center)
+    f = np.sqrt(term)
     # END YOUR CODE
 
     return float(f)
@@ -168,7 +186,8 @@ def physical_focal_length_from_calibration(
     f_mm = None
 
     # YOUR CODE HERE
-    pass
+    scale_factor = sensor_diagonal_mm / image_diagonal_pixels
+    f_mm = f*scale_factor
     # END YOUR CODE
 
     return f_mm

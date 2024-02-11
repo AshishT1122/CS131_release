@@ -4,6 +4,7 @@ from skimage.feature import corner_peaks
 from skimage.util.shape import view_as_blocks
 from scipy.spatial.distance import cdist
 from scipy.ndimage.filters import convolve
+from skimage.transform import warp
 
 from part2.utils import pad, unpad, get_output_space, warp_image
 
@@ -44,15 +45,18 @@ def harris_corners(img, window_size=3, k=0.04):
     dy = filters.sobel_h(img)
 
     ### YOUR CODE HERE
-    pass
+    
     # 2. Compute products of derivatives (I_x^2, I_y^2, I_xy) at each pixel
-    
-    
+    Ixx, Iyy, Ixy = dx**2, dy**2, dx*dy
+
     # 3. Compute matrix M at each pixel
-    
+    Ixx, Iyy, Ixy = [convolve(I, window, mode='constant', cval=0) for I in [dx**2, dy**2, dx*dy]]
 
     # 4. Compute corner response R=Det(M) - k*(Trace(M)^2) at each pixel
-    
+    Det_M = Ixx * Iyy - Ixy ** 2
+    Trace_M = Ixx + Iyy
+    response = Det_M - k * (Trace_M ** 2)
+
     
     ### END YOUR CODE
 
@@ -137,7 +141,10 @@ def match_descriptors(desc1, desc2, threshold=0.5):
     dists = cdist(desc1, desc2)
 
     ### YOUR CODE HERE
-    pass
+    sorted_indices = np.argsort(dists, axis=1)
+    ratios = dists[np.arange(dists.shape[0]), sorted_indices[:, 0]] / dists[np.arange(dists.shape[0]), sorted_indices[:, 1]]
+    matches = np.column_stack((np.arange(dists.shape[0])[ratios < threshold], sorted_indices[ratios < threshold, 0]))
+
     ### END YOUR CODE
 
     return matches
@@ -170,7 +177,7 @@ def fit_affine_matrix(p1, p2):
     p2 = pad(p2)
 
     ### YOUR CODE HERE
-    pass
+    H, *_ = np.linalg.lstsq(p2, p1, rcond=None)
     ### END YOUR CODE
 
     # Sometimes numerical issues cause least-squares to produce the last
@@ -241,8 +248,9 @@ def ransac(keypoints1, keypoints2, matches, n_iters=200, threshold=20):
         sample2 = pad(keypoints2[samples[:,1]])
     
     ### YOUR CODE HERE
-    pass
+        if (inliers := np.sqrt(np.sum(((matched2 @ (H := np.linalg.lstsq(sample2, sample1, rcond=None)[0])) - matched1) ** 2, axis=1)) < threshold).sum() > n_inliers: max_inliers, n_inliers, H_best = inliers, inliers.sum(), H
     ### END YOUR CODE
+    if H_best is not None: H_best, _ = np.linalg.lstsq(matched2[max_inliers], matched1[max_inliers], rcond=None)[:2]
     return H, orig_matches[max_inliers]
 
 
@@ -276,7 +284,15 @@ def linear_blend(img1_warped, img2_warped):
     left_margin = np.argmax(img2_mask[out_H//2, :].reshape(1, out_W), 1)[0]
 
     ### YOUR CODE HERE
-    pass
+    w1 = np.zeros_like(img1_warped)
+    w2 = np.zeros_like(img2_warped)
+    
+    linear_weights = np.linspace(1, 0, right_margin-left_margin)
+    w1[:, :right_margin] = np.hstack([np.ones(left_margin), linear_weights])
+    w2[:, left_margin:] = np.hstack([linear_weights[::-1], np.ones(out_W - right_margin)])
+    
+    merged = img1_warped * w1 + img2_warped * w2
+
     ### END YOUR CODE
 
     return merged
@@ -317,7 +333,28 @@ def stitch_multiple_images(imgs, desc_func=simple_descriptor, patch_size=5):
         matches.append(mtchs)
 
     ### YOUR CODE HERE
-    pass
+    Hs = [np.eye(3)]
+    for i in range(len(imgs) - 1):
+        # Match descriptors between consecutive images
+        matches = match_descriptors(descriptors[i], descriptors[i + 1], cross_check=True)
+        # Compute transformation matrix using RANSAC
+        H, _ = ransac(keypoints[i], keypoints[i + 1], matches, threshold=1)
+        # Accumulate transformations relative to the reference frame
+        Hs.append(H @ Hs[-1])
+
+    # Determine output image shape and offset based on the accumulated transformations
+    output_shape, offset = get_output_space(imgs[0], imgs[1:], Hs[1:])
+    panorama = np.zeros((*output_shape, 3), dtype=np.float32)
+
+    # Step 4 & 5: Warp images and merge
+    for i, (img, H) in enumerate(zip(imgs, Hs)):
+        img_warped = warp(img, np.linalg.inv(H), output_shape=output_shape, cval=-1)
+        img_mask = (img_warped != -1).all(axis=2)  # Update mask for RGB images
+
+        # Merge using the overlap method
+        merged = panorama + img_warped
+        overlap = (img_mask * 1.0 + (panorama.sum(axis=2) != 0))  # Update overlap calculation for RGB
+        panorama = merged / np.maximum(overlap[..., None], 1)
     ### END YOUR CODE
 
     return panorama
